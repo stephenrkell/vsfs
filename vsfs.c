@@ -229,6 +229,7 @@ static struct dirent *find_dirent_by_name(struct dirent *first, struct dirent *l
 {
 	
 }
+
 void vsfs_dumpfs(void)
 {
 	struct superblock *super = mapping;
@@ -260,4 +261,21 @@ void vsfs_dumpfs(void)
 	debug_printf(0, "\n\n");
 
 	debug_printf(0, "--- end vsfs dump\n");
+}
+
+void vsfs_dumpi(unsigned idx)
+{
+	struct inode *inode = &inodes[idx];
+
+	debug_printf(0, "inode %u:\n", idx);
+	debug_printf(0, "   type: %s\n", (inode->ftype == VSF_FREE) ? "free" :
+	                                 (inode->ftype == VSF_FILE) ? "regular file" :
+	                                 (inode->ftype == VSF_DIR) ? "directory" : "(invalid)");
+	debug_printf(0, "   links: %d\n", (int) inode->refcount);
+	debug_printf(0, "   size in bytes: %u\n", (unsigned) inode->size);
+	debug_printf(0, "   # blocks allocated: %u\n", (unsigned) inode->nblocks);
+	for (unsigned i = 0; i < NDIRECT; ++i)
+	{
+		debug_printf(0, "   direct block %d: %u\n", (int) i, (unsigned) inode->direct[i]);
+	}
 }

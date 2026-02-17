@@ -63,5 +63,5 @@ struct dirent *vsfs_link(struct inode *dir, struct inode *tgt, const char *name)
 struct dirent *vsfs_unlink(struct dirent *ent); CMDLINE_FMT(unlink, "%u");
 struct inode *vsfs_lookup(struct inode *dir, const char *pathname); CMDLINE_FMT(lookup, "%u");
 void vsfs_dumpfs(void); CMDLINE_FMT(dumpfs, "");
-
+void vsfs_dumpi(unsigned idx); CMDLINE_FMT(dumpi, "%u");
 #endif

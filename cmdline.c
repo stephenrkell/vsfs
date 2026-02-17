@@ -51,6 +51,7 @@ int main(int argc, char **argv)
 			/* We have a command in cmd */
 			if (0 == strcmp(cmd, "link")) { warnx("FIXME: Do link"); }
 			else if (0 == strcmp(cmd, "dumpfs")) { vsfs_dumpfs(); }
+			else if (0 == strcmp(cmd, "dumpi")) { unsigned i; int nfields = sscanf(lineptr + nbytes, "%u", &i); if (nfields == 1) vsfs_dumpi(i); else debug_printf(0, "parse error\n"); }
 			else warnx("unknown command");
 		}
 
