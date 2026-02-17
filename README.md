@@ -49,6 +49,8 @@ You can also use `dumpi n` to dump a inode number `n`,
 `dumpdir n` to dump as a directory the contents of the file with inode number `n`.
 `dump n` to dump as a raw bytes the contents of the file with inode number `n`.
 
+FIXME: support more commands
+FIXME: add a fuse layer
 
 Currently this filesystem has a number of limitations.
 
@@ -60,13 +62,13 @@ Currently this filesystem has a number of limitations.
 
 It has some support for block allocation, but only using direct blocks.
 
-See if you can extend it in one or more of the following ways
+See if you can extend it in one or more of the following ways.
 
 * support filesystems of arbitrary length, subject to 262144 byte minimum
 * create new empty files
 * append data to a file
-* use an indirect block, to  support extending a file beyond 10 blocks
-* delete a file
+* use an indirect block to support extending a file beyond 10 blocks
+* delete a file (tricky!)
 
 FIXME: make it do a few more things out of the box, but not everything
 
