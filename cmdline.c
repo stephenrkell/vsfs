@@ -32,12 +32,8 @@ int main(int argc, char **argv)
 	vsfs_init(argv[1], TOTAL_BLOCKS * BLOCK_SIZE);
 	/* To allow command-line interaction and test scripts,
 	 * we read lines from stdin, to be parsed with fscanf/sscanf:
-	 * first we do  "%s" to get 'command' and 'rest',
-	 * and then will scan 'rest' according to a per-command format string:
-	 *
-	 * 
-	 *
-	 * */
+	 * first we do  "%s" to get 'command', then scan the rest
+	 * according to a per-command format string. */
 	ssize_t nread;
 	size_t bufsize = 0;
 	char *lineptr = NULL;
@@ -50,8 +46,12 @@ int main(int argc, char **argv)
 		{
 			/* We have a command in cmd */
 			if (0 == strcmp(cmd, "link")) { warnx("FIXME: Do link"); }
-			else if (0 == strcmp(cmd, "dumpfs")) { vsfs_dumpfs(); }
-			else if (0 == strcmp(cmd, "dumpi")) { unsigned i; int nfields = sscanf(lineptr + nbytes, "%u", &i); if (nfields == 1) vsfs_dumpi(i); else debug_printf(0, "parse error\n"); }
+			else if (0 == strcmp(cmd, "dumpfs"))  {                                                                                                                                              dumpfs(); }
+			else if (0 == strcmp(cmd, "dumpi"))   { unsigned i;                 int nfields = sscanf(lineptr + nbytes, "%u", &i);         if (nfields == 1)                                      dumpi(i);        else debug_printf(0, "parse error\n"); }
+			else if (0 == strcmp(cmd, "dumpd"))   { unsigned i;                 int nfields = sscanf(lineptr + nbytes, "%u", &i);         if (nfields == 1)                                      dumpd(i);        else debug_printf(0, "parse error\n"); }
+			else if (0 == strcmp(cmd, "dumpf"))   { unsigned i;                 int nfields = sscanf(lineptr + nbytes, "%u", &i);         if (nfields == 1)                                      dumpf(i);        else debug_printf(0, "parse error\n"); }
+			else if (0 == strcmp(cmd, "lookupd")) { unsigned i; char *s = NULL; int nfields = sscanf(lineptr + nbytes, "%u %ms", &i, &s); if (nfields == 2) debug_printf(0, "%s\n", print_dirent(lookupd(i, s))); else debug_printf(0, "parse error\n"); if (s) free(s); }
+			else if (0 == strcmp(cmd, "creat")  ) { unsigned i; char *s = NULL; int nfields = sscanf(lineptr + nbytes, "%u %ms", &i, &s); if (nfields == 2) debug_printf(0, "%s\n",  print_inode(creat(i, s)));   else debug_printf(0, "parse error\n"); if (s) free(s); }
 			else warnx("unknown command");
 		}
 

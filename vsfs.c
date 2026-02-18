@@ -1,25 +1,26 @@
 /* Here we implement vsfs as described in the OSTEP book,
  * as a server process backed by a file on disk.
  *
- * How will it execute?
+ * How can we execute it?
  *
  * 0. For testing, via a command-line interface
  *
- * 1. via a fuse wrapper, for the students to run
- * on an emulated Linux machine.
+ * 1. (not ready yet!) via a fuse wrapper, mountable
+ * on a Linux machine with the right privileges
+ * (e.g. qemu + Linux on a lab machine).
  *
- * --
- *
- * 2. The students could wrap it themselves in an NFS server
- * and then mount it from their QEMU Linux machine.
- *
- * 3. Some extensions:
- *     -- replication: NFS server now talks to two or more
- *        vsfs backends, using a quorum approach
+ * 2. (not ready yet) via an NFS server wrapped around it --
+ * again, mountable from the QEMU Linux machine.
  *
  * The initial version that we supply to the students is
  * missing some implementation: it can only create empty files,
- * and cannot delete files?
+ * and cannot delete files....
+ *
+ * FIXME: this is not thread-safe! Use a single-threaded event
+ * loop only.
+ *
+ * FIXME: error reporting is not good. We do too much "return NULL"
+ * and the like. Better to collect errors in a thread-local.
  */
 
 #include <stdlib.h>
@@ -177,9 +178,21 @@ static _Bool ensure_allocated_length(struct inode *i, unsigned len)
 	/* XXX: must zero any fresh length allocated */
 	return 0;
 }
+
+static struct dirent *find_dirent_by_name(struct inode *inode, const char *name);
+
+/* Directories are arrays of dirents, terminated by
+ * an all-zero dirent. It follows that directories
+ * always have one or more blocks allocated to them and
+ * are always `sizeof (struct dirent)` bytes or larger. */
 static struct dirent *append_dir_entry(struct inode *dir, struct inode *tgt, const char *string)
 {
+	/* fail if there is already an entry with this name */
+	if (find_dirent_by_name(dir, string)) return NULL;
+	/* the empty name is not allowed */
+	if (!string[0]) return NULL;
 	unsigned initial_nentries_incl_terminator = dir->size / sizeof (struct dirent);
+	assert(initial_nentries_incl_terminator >= 1);
 	_Bool success = ensure_allocated_length(dir,
 		1 + initial_nentries_incl_terminator * sizeof (struct dirent));
 	if (!success) return NULL;
@@ -204,13 +217,54 @@ static struct dirent *append_dir_entry(struct inode *dir, struct inode *tgt, con
 	++tgt->refcount;
 	dir->size += sizeof (struct dirent);
 	strncpy(d->name, string, MAX_NAME_LEN);
+	d->name[MAX_NAME_LEN-1] = '\0'; // ensure the buffer is null-terminated
 	return d;
 }
 /* public functions */
 
 struct inode *vsfs_creat(struct inode *dir, const char *name)
 {
-	/* Create an empty regular file */
+#warning "creat is unimplemented"
+	/* Create an empty regular file, and make a new directory entry
+	 * pointing at it. */
+	return NULL;
+}
+struct inode *vsfs_mkdir(struct inode *dir, const char *name)
+{
+#warning "mkdir is unimplemented"
+	/* Create an empty directory, and make a new directory entry
+	 * pointing at it. Also create its '.' and '..' entries. */
+	return NULL;
+}
+struct inode *vsfs_rmdir(struct inode *dir)
+{
+#warning "rmdir is unimplemented"
+	return NULL; /* return the parent directory inode on success */
+}
+unsigned long vsfs_truncate(struct inode *i, unsigned long sz)
+{
+#warning "truncate is mostly unimplemented"
+	/* Give regular file 'i' the size 'sz'. */
+	if (i->ftype != VSF_FILE) return (unsigned long) -1; // error!
+	if (sz > i->size)
+	{
+		// TODO: grow the file
+	}
+	else if (sz < i->size)
+	{
+		// TODO: shrink the file
+	}
+	return i->size;
+}
+long vsfs_read(struct inode *f, unsigned long offset, char *buf, unsigned long sz)
+{
+#warning "read is unimplemented"
+	return 0;
+}
+long vsfs_write(struct inode *f, unsigned long offset, const char *buf, unsigned long sz)
+{
+#warning "write is unimplemented"
+	return 0;
 }
 struct dirent *vsfs_link(struct inode *dir, struct inode *tgt, const char *name)
 {
@@ -218,19 +272,18 @@ struct dirent *vsfs_link(struct inode *dir, struct inode *tgt, const char *name)
 }
 struct dirent *vsfs_unlink(struct dirent *ent)
 {
-	
+#warning "unlink is unimplemented"
+	return NULL;
 }
 struct inode *vsfs_lookup(struct inode *dir, const char *pathname)
 {
-	
-}
-static struct dirent *find_dirent_by_name(struct dirent *first, struct dirent *limit,
-	const char *name)
-{
-	
+#warning "lookup is unimplemented"
+	/* This is an iterated verson of `find_dirent_by_name`. Use strchr()
+	 * to iterate through the pathname. */
+	return NULL;
 }
 
-void vsfs_dumpfs(void)
+void dumpfs(void)
 {
 	struct superblock *super = mapping;
 	debug_printf(0, "--- begin vsfs dump\n");
@@ -263,7 +316,7 @@ void vsfs_dumpfs(void)
 	debug_printf(0, "--- end vsfs dump\n");
 }
 
-void vsfs_dumpi(unsigned idx)
+void dumpi(unsigned idx)
 {
 	struct inode *inode = &inodes[idx];
 
@@ -279,3 +332,86 @@ void vsfs_dumpi(unsigned idx)
 		debug_printf(0, "   direct block %d: %u\n", (int) i, (unsigned) inode->direct[i]);
 	}
 }
+
+enum cb_res_t for_each_data_block(struct inode *inode, block_cb_t *cb, uintptr_t arg)
+{
+	enum cb_res_t res = 0;
+	for (unsigned i = 0; i < inode->nblocks; ++i)
+	{
+		uint16_t blocknum;
+		if (i < NDIRECT) blocknum = inode->direct[i];
+		else
+		{
+			// FIXME: support indirect blocks
+			err(EXIT_FAILURE, "ran past the end of direct blocks");
+		}
+		res = cb(&data_blocks[blocknum], i, arg);
+		if (res == VSF_STOP) return res;
+	}
+	return res;
+}
+
+struct dirent_search_args
+{
+	uintptr_t total_bytes_in_file;
+	const char *name;
+	struct dirent *out_result;
+};
+static enum cb_res_t find_dirent_by_name_in_one_block(data_block_t *block, unsigned block_idx_in_file,
+	uintptr_t arg)
+{
+	struct dirent_search_args *args = (struct dirent_search_args *) arg;
+	unsigned bytes_remaining_in_file = args->total_bytes_in_file - BLOCK_SIZE * block_idx_in_file;
+	unsigned bytes_to_search_in_this_block = (bytes_remaining_in_file < BLOCK_SIZE) ? bytes_remaining_in_file : BLOCK_SIZE;
+	unsigned dirents_to_search = bytes_to_search_in_this_block / sizeof (struct dirent);
+	struct dirent *block_dirents = (struct dirent *) block;
+	for (unsigned i = 0; i < dirents_to_search; ++i)
+	{
+		if (0 == strncmp(block_dirents[i].name, args->name, MAX_NAME_LEN))
+		{
+			args->out_result = &block_dirents[i];
+			return VSF_STOP;
+		}
+	}
+	return VSF_CONTINUE;
+}
+
+static struct dirent *find_dirent_by_name(struct inode *inode, const char *name)
+{
+	if (inode->ftype != VSF_DIR) return NULL;
+	struct dirent_search_args args = { .total_bytes_in_file = inode->size,
+		.name = name
+	};
+	enum cb_res_t res = for_each_data_block(inode, find_dirent_by_name_in_one_block,
+		(uintptr_t) &args);
+	if (res == VSF_STOP) return args.out_result;
+	return NULL;
+}
+
+/* The following serve the command line, but need to access the inode table
+ * or other structures private to this file. XXX: make it possible to link
+ * against this. */
+
+void dumpd(unsigned idx)
+{
+	debug_printf(0, "contents of file with inode %u, as a directory:\n", idx);
+	struct inode *inode = &inodes[idx];
+	if (inode->ftype != VSF_DIR) debug_printf(0, "(not a directory)");
+
+	for_each_data_block(inode, dump_one_block_as_dirents, inode->size);
+}
+
+void dumpf(unsigned idx)
+{
+	debug_printf(0, "contents of file with inode %u, as raw bytes:\n", idx);
+	struct inode *inode = &inodes[idx];
+	if (inode->ftype == VSF_FREE) debug_printf(0, "inode is unallocated");
+
+	for_each_data_block(inode, dump_one_block_as_raw_data, inode->size);
+}
+
+struct dirent *lookupd(unsigned idx, const char *filename)
+{ return find_dirent_by_name(&inodes[idx], filename); }
+
+struct inode *creat(unsigned idx, const char *filename)
+{ return vsfs_creat(&inodes[idx], filename); }

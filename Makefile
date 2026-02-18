@@ -2,7 +2,7 @@
 default: vsfs
 run-qemu: qemu-disk-image
 
-sources += vsfs.c cmdline.c
+sources += vsfs.c cmdline.c dump.c
 
 CFLAGS += -g -Wall -MMD
 deps := $(patsubst %.c,%.d,$(sources))
