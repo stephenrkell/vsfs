@@ -56,7 +56,7 @@ FIXME: add a fuse layer
 Currently this filesystem has a number of limitations.
 
 * it cannot create new files or directories (creating the root directory is special-cased)
-* it cannot read existing files or directories
+* it cannot read existing files or directories (except to look up a named item)
 * it cannot modify existing files
 * it cannot modify existing directories, except adding directory entries
 * etc
@@ -66,7 +66,7 @@ It has some support for block allocation, but only using direct blocks.
 As an exercise, see if you can extend it in one or more of the following ways.
 
 * create new empty files
-* append data to a file
+* append data to a file (hint: start with the 'truncate' call)
 * update existing data within a file
 * use an indirect block to support extending a file beyond 10 blocks
 * support filesystems longer than 64 blocks
