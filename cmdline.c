@@ -4,6 +4,7 @@
 
 /* In this file we actually define the table of commands and their argment
  * format strings. You are not expected to understand this. */
+ #if defined(__GNUC__) && __GNUC__ >= 4  && !defined(__APPLE__)
 #define CMDLINE_FMT(ident, argstr) \
 	extern const char ident ## _cmdline; \
 	extern const char ident ## _cmdstr; \
@@ -17,8 +18,12 @@
             ".quad " #ident "_cmdstring\n"\
             ".quad " #ident "_argstr\n"\
             ".popsection\n")
-
-typedef const char cmdpair[2];
+#else
+#define CMDLINE_FMT(ident, argstr) \
+	__attribute__((section("_cmdline_cmds"))) const cmdpair ident ## _cmdline = { #ident, argstr }
+#warning "Your compiler does not support the GNU-style inline assembly used to define the command table. Functionality may be limited."
+#endif
+typedef const char *cmdpair[2];
 extern cmdpair *__start__cmdline_cmds;
 extern cmdpair *__stop__cmdline_cmds;
 
